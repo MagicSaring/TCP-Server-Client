@@ -8,6 +8,40 @@
 
 #pragma comment(lib, "WS2_32.LIB")
 
+enum CMD
+{
+	CMD_LOGIN = 1,
+	CMD_LOGOUT = 2,
+	CMD_ERROR = 3,
+};
+struct DataHeader
+{
+	short cmd;
+	short dataLength;
+};
+
+//DataPackage
+struct Login
+{
+	char userName[32];
+	char passWord[32];
+};
+
+struct LoginResult
+{
+	int result;
+};
+
+struct Logout
+{
+	char userName[32];
+};
+
+struct LogoutResult
+{
+	int result;
+};
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);		//生成版本号
@@ -51,7 +85,9 @@ int main()
 
 	while (true)
 	{
+		
 		//3. 输入请求命令
+		printf("请输入请求命令\n");
 		char cmdBuff[128] = { 0 };
 		scanf("%s", &cmdBuff);
 		//4.处理请求命令
@@ -60,34 +96,51 @@ int main()
 			printf("收到exit命令,任务结束\n");
 			break;
 		}
+		else if(0 == strcmp(cmdBuff, "login"))
+		{
+			Login login = {"magic", "rere2121"};
+			DataHeader dh = { CMD_LOGIN, sizeof(login) };
+			
+			send(sock_client, (char*)&dh, sizeof(dh), 0);
+			send(sock_client, (char*)&login, sizeof(login), 0);
+
+			//接受服务器返回的数据
+			DataHeader retHead = {};
+			LoginResult loginRet = {};
+
+			recv(sock_client, (char*)&retHead, sizeof(retHead), 0);
+			recv(sock_client, (char*)&loginRet, sizeof(loginRet), 0);
+
+			printf("LoginResult:%d\n", loginRet.result);
+		}
+		else if (0 == strcmp(cmdBuff, "logout"))
+		{
+			Login logout = { "magic"};
+			DataHeader dh = { CMD_LOGOUT, sizeof(logout) };
+
+			send(sock_client, (char*)&dh, sizeof(dh), 0);
+			send(sock_client, (char*)&logout, sizeof(logout), 0);
+
+			//接受服务器返回的数据
+			DataHeader retHead = {};
+			LoginResult logoutRet = {};
+
+			recv(sock_client, (char*)&retHead, sizeof(retHead), 0);
+			recv(sock_client, (char*)&logoutRet, sizeof(logoutRet), 0);
+
+			printf("LogoutResult:%d\n", logoutRet.result);
+
+		}
 		else
 		{
-			//5.向服务器发送命令
-			send(sock_client, cmdBuff, sizeof(cmdBuff), 0);
-		}
-
-		//6.接收服务器信息 recv
-		char recvBuff[128] = { 0 };
-		int nlen = recv(sock_client, recvBuff, sizeof(recvBuff), 0);
-		if (nlen > 0)
-		{
-			printf("接收到数据:%s\n", recvBuff);
+			printf("不支持的命令,请重新输入.\n");
 		}
 	}
 
-	//3. 接收服务器信息 recv
-	char recvBuf[256] = {};
-	int nlen = recv(sock_client, recvBuf, sizeof(recvBuf), 0);
-
-	if (nlen > 0)
-	{
-		printf("接收到数据:%s", recvBuf);
-	}
-
-	//4.关闭套接字 closesocket
+	//7.关闭套接字 closesocket
 	closesocket(sock_client);
 
-	//5.清楚windows socket环境
+	//8.清除windows socket环境
 	WSACleanup();
 	getchar();
 
