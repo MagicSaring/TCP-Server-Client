@@ -1,5 +1,5 @@
 #define WIN32_LEAN_AND_MEAN
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
+//#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 
 #include <windows.h>
@@ -11,8 +11,10 @@
 enum CMD
 {
 	CMD_LOGIN = 1,
-	CMD_LOGOUT = 2,
-	CMD_ERROR = 3,
+	CMD_LOGIN_RESULT = 2,
+	CMD_LOGOUT = 3,
+	CMD_LOGOUT_RESULT = 4,
+	CMD_ERROR = 5,
 };
 struct DataHeader
 {
@@ -21,30 +23,49 @@ struct DataHeader
 };
 
 //DataPackage
-struct Login
+struct Login : public DataHeader
 {
-	char userName[32];
-	char passWord[32];
-
 	Login()
 	{
+		cmd = CMD_LOGIN;
+		dataLength = sizeof(Login);
 		memset(userName, 0, sizeof(userName));
 		memset(passWord, 0, sizeof(passWord));
 	}
+	char userName[32];
+	char passWord[32];
 };
 
-struct LoginResult
+struct LoginResult : public DataHeader
 {
+	LoginResult()
+	{
+		cmd = CMD_LOGIN_RESULT;
+		dataLength = sizeof(LoginResult);
+		result = 0;
+	}
 	int result;
 };
 
-struct Logout
+struct Logout : public DataHeader
 {
+	Logout()
+	{
+		cmd = CMD_LOGOUT;
+		dataLength = sizeof(Logout);
+		memset(userName, 0, sizeof(userName));
+	}
 	char userName[32];
 };
 
-struct LogoutResult
+struct LogoutResult : public DataHeader
 {
+	LogoutResult()
+	{
+		cmd = CMD_LOGOUT_RESULT;
+		dataLength = sizeof(LogoutResult);
+		result = 0;
+	}
 	int result;
 };
 
@@ -59,7 +80,6 @@ int main()
 		printf("错误,加载winsock.dll失败...错误代码:%d", WSAGetLastError());
 		return 0;
 	}
-
 
 	// -- 用Socket API建立简易TCP服务器
 	//1.创建一个socket套接字
@@ -101,7 +121,6 @@ int main()
 	//4.accept 等待接受客户端连接
 	struct sockaddr_in client_addr = {};
 	SOCKET new_socket = INVALID_SOCKET;
-	//char sendBuff[128] = { 0 };
 
 	new_socket = accept(sock_server, (struct sockaddr*)&client_addr, &addr_len);
 	if (new_socket == INVALID_SOCKET)
@@ -114,7 +133,6 @@ int main()
 
 	printf("新客户端加入: Socket = %d, IP = %s\n", new_socket, inet_ntoa(client_addr.sin_addr));
 
-	//char recvBuf[128] = {};
 	while (true)
 	{
 		DataHeader header = {};
@@ -126,31 +144,28 @@ int main()
 			break;
 		}
 
-		printf("收到命令:%d,数据长度;%d\n", header.cmd, header.dataLength);
-
 		switch (header.cmd)
 		{
 			case CMD_LOGIN:
 			{
 				Login login = {};
-				recv(new_socket, (char*)&login, sizeof(login), 0);
+				recv(new_socket, (char*)&login + sizeof(DataHeader), sizeof(login) - sizeof(DataHeader), 0);
 
+				printf("收到命令:CMD_LOGIN, 数据长度;%d\n", login.dataLength);
 				printf("用户登录...用户姓名:%s, 密码:%s\n", login.userName, login.passWord);
 				
-				LoginResult ret = {1};
-				send(new_socket, (char*)&header, sizeof(header), 0);
+				LoginResult ret;
 				send(new_socket, (char*)&ret, sizeof(ret), 0);
 			}break;
 			case CMD_LOGOUT:
 			{
 				Logout logout = {};
-				recv(new_socket, (char*)&logout, sizeof(logout), 0);
+				recv(new_socket, (char*)&logout + sizeof(DataHeader), sizeof(logout) - sizeof(DataHeader), 0);
 
+				printf("收到命令:CMD_LOGOUT, 数据长度;%d\n", logout.dataLength);
 				printf("用户登出...用户姓名:%s\n", logout.userName);
 
-				LogoutResult ret = { 1 };
-				
-				send(new_socket, (char*)&header, sizeof(header), 0);
+				LogoutResult ret;
 				send(new_socket, (char*)&ret, sizeof(ret), 0);
 			}break;
 			default:
