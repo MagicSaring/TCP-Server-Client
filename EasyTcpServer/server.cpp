@@ -134,6 +134,9 @@ int main()
 			{
 				Login login = {};
 				recv(new_socket, (char*)&login, sizeof(login), 0);
+
+				printf("用户登录...用户姓名:%s, 密码:%s\n", login.userName, login.passWord);
+				
 				LoginResult ret = {1};
 				send(new_socket, (char*)&header, sizeof(header), 0);
 				send(new_socket, (char*)&ret, sizeof(ret), 0);
@@ -142,6 +145,9 @@ int main()
 			{
 				Logout logout = {};
 				recv(new_socket, (char*)&logout, sizeof(logout), 0);
+
+				printf("用户登出...用户姓名:%s\n", logout.userName);
+
 				LogoutResult ret = { 1 };
 				
 				send(new_socket, (char*)&header, sizeof(header), 0);

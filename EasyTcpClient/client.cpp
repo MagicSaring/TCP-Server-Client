@@ -115,7 +115,7 @@ int main()
 		}
 		else if (0 == strcmp(cmdBuff, "logout"))
 		{
-			Login logout = { "magic"};
+			Logout logout = { "magic"};
 			DataHeader dh = { CMD_LOGOUT, sizeof(logout) };
 
 			send(sock_client, (char*)&dh, sizeof(dh), 0);
