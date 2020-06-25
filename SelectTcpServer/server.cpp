@@ -17,7 +17,8 @@ enum CMD
 	CMD_LOGIN_RESULT = 2,
 	CMD_LOGOUT = 3,
 	CMD_LOGOUT_RESULT = 4,
-	CMD_ERROR = 5,
+	CMD_NEW_USER_JOIN = 5,
+	CMD_ERROR = 6,
 };
 struct DataHeader
 {
@@ -72,6 +73,17 @@ struct LogoutResult : public DataHeader
 	int result;
 };
 
+struct NewUserJoin : public DataHeader
+{
+	NewUserJoin()
+	{
+		cmd = CMD_NEW_USER_JOIN;
+		dataLength = sizeof(NewUserJoin);
+		sock = 0;
+	}
+	int sock;
+};
+
 vector<SOCKET> g_clients;
 
 int dealReadWirte(SOCKET s)
@@ -82,7 +94,7 @@ int dealReadWirte(SOCKET s)
 	int nLen = recv(s, szRecv, sizeof(DataHeader), 0);
 	if (nLen <= 0)
 	{
-		printf("客户端已退出,任务结束\n");
+		printf("客户端<Socket=%d>已退出,任务结束\n", s);
 		return -1;
 	}
 
@@ -95,7 +107,7 @@ int dealReadWirte(SOCKET s)
 		recv(s, szRecv + sizeof(DataHeader), header->dataLength - sizeof(DataHeader), 0);
 
 		Login* login = (Login*)szRecv;
-		printf("收到命令:CMD_LOGIN, 数据长度;%d\n", login->dataLength);
+		printf("收到客户端<Socket=%d>命令:CMD_LOGIN, 数据长度;%d\n", s, login->dataLength);
 		printf("用户登录...用户姓名:%s, 密码:%s\n", login->userName, login->passWord);
 
 		LoginResult ret;
@@ -107,7 +119,7 @@ int dealReadWirte(SOCKET s)
 		recv(s, szRecv + sizeof(DataHeader), header->dataLength - sizeof(DataHeader), 0);
 
 		Logout* logout = (Logout*)szRecv;
-		printf("收到命令:CMD_LOGOUT, 数据长度;%d\n", logout->dataLength);
+		printf("收到客户端<Socket=%d>命令:CMD_LOGOUT, 数据长度;%d\n", s, logout->dataLength);
 		printf("用户登出...用户姓名:%s\n", logout->userName);
 
 		LogoutResult ret;
@@ -179,10 +191,12 @@ int main()
 		fd_set fdWrite;
 		fd_set fdExp;
 
+		//FD_ZERO:清空一个文件描述符集合
 		FD_ZERO(&fdRead);
 		FD_ZERO(&fdWrite);
 		FD_ZERO(&fdExp);
 
+		//FD_SET:将监听的文件描述符，添加到监听集合中
 		FD_SET(sock_server, &fdRead);
 		FD_SET(sock_server, &fdWrite);
 		FD_SET(sock_server, &fdExp);
@@ -192,8 +206,22 @@ int main()
 			FD_SET(g_clients[i], &fdRead);
 		}
 
-		//nfds 是一个整数值 是指fd_set集合中所有描述符(socket)的范围,而不是数量
-		//即是所有文件描述符最大值+1,在Windows中这个参数可以写0
+		/*
+		select函数原型:
+		int select(int nfds, fd_set *readfds, fd_set *writefds,fd_set *exceptfds, struct timeval *timeout);
+
+		参数列表:
+		nfds:		监听的所有文件描述符的最大描述符 + 1(内核采取轮询的方式)
+		readfds:	读文件描述监听集合
+		writefds:	写文件描述符集合
+		exceptfds:	异常文件描述符集合
+		timeout:	大于0:设置监听超时时长;NULL:阻塞监听;0:非阻塞监听
+
+		返回值:
+		大于0:所欲监听集合中,满足对应时间的总数
+		0:没有满足的
+		-1:出错error
+		*/
 		timeval t = { 0,0 };
 		int ret = select(sock_server + 1, &fdRead, &fdWrite, &fdExp, &t);
 		if (ret < 0)
@@ -202,8 +230,10 @@ int main()
 			break;
 		}
 
+		//FD_ISSET:判断一个文件描述符是否在一个集合中，返回值:在1,不在0
 		if (FD_ISSET(sock_server, &fdRead))
 		{
+			//FD_CLR:将一个文件描述符从集合中移除
 			FD_CLR(sock_server, &fdRead);
 
 			//4.accept 等待接受客户端连接
@@ -215,6 +245,13 @@ int main()
 				printf("错误,接受到无效客户端Socket...错误代码:%d\n", WSAGetLastError());
 				closesocket(new_socket);
 				continue;
+			}
+
+			for (size_t i = 0; i < g_clients.size(); ++i)
+			{
+				NewUserJoin userJoin;
+				userJoin.sock = g_clients[i];
+				send(g_clients[i], (char*)&userJoin, sizeof(userJoin), 0);
 			}
 
 			g_clients.push_back(new_socket);
@@ -231,6 +268,9 @@ int main()
 				}
 			}
 		}
+		
+		printf("空闲时间处理其他业务\n");
+		
 	}
 
 	//7.closesocket 关闭套接字
