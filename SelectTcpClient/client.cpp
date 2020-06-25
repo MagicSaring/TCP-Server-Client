@@ -172,8 +172,8 @@ int main()
 	while (true)
 	{
 		fd_set fdReads;
-		FD_ZERO(&fdReads);
-		FD_SET(sock_client, &fdReads);
+		FD_ZERO(&fdReads);					//FD_ZERO:清空一个文件描述符集合
+		FD_SET(sock_client, &fdReads);		//FD_SET:将监听的文件描述符，添加到监听集合中
 
 		timeval t = { 0, 0 };
 		int ret = select(sock_client + 1, &fdReads, NULL, NULL, &t);
@@ -183,8 +183,10 @@ int main()
 			break;
 		}
 
+		//FD_ISSET:判断一个文件描述符是否在一个集合中，返回值:在1,不在0
 		if (FD_ISSET(sock_client, &fdReads))
 		{
+			//FD_CLR:将一个文件描述符从集合中移除
 			FD_CLR(sock_client, &fdReads);
 
 			if (-1 == dealReadWirte(sock_client))
