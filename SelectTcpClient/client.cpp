@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <WinSock2.h>
 #include <stdio.h>
+#include <thread>
 
 #pragma comment(lib, "WS2_32.LIB")
 
@@ -128,6 +129,41 @@ int dealReadWirte(SOCKET s)
 	return 0;
 }
 
+bool g_bRun = true;
+void cmdThread(SOCKET s)
+{
+	while (true)
+	{
+		printf("Please input your cmd\n");
+		char cmdBuff[256] = {};
+		scanf("%s", &cmdBuff);
+		if (0 == strcmp(cmdBuff, "exit"))
+		{
+			g_bRun = false;
+			printf("退出cmdThread线程\n");
+			break;
+		}
+		else if (0 == strcmp(cmdBuff, "login"))
+		{
+			Login login;
+			strcpy_s(login.userName, sizeof(login.userName), "magic");
+			strcpy_s(login.passWord, sizeof(login.passWord), "rere2121");
+			send(s, (char*)&login, sizeof(login), 0);
+		}
+
+		else if (0 == strcmp(cmdBuff, "logout"))
+		{
+			Logout logout;
+			strcpy_s(logout.userName, sizeof(logout.userName), "magic");
+			send(s, (char*)&logout, sizeof(logout), 0);
+		}
+		else
+		{
+			printf("不支持的命令\n");
+		}
+	}
+}
+
 int main()
 {
 	WORD ver = MAKEWORD(2, 2);		//生成版本号
@@ -169,13 +205,16 @@ int main()
 
 	printf("连接服务器成功...\n");
 
-	while (true)
+	std::thread t1(cmdThread, sock_client);
+	t1.detach();
+
+	while (g_bRun)
 	{
 		fd_set fdReads;
 		FD_ZERO(&fdReads);					//FD_ZERO:清空一个文件描述符集合
 		FD_SET(sock_client, &fdReads);		//FD_SET:将监听的文件描述符，添加到监听集合中
 
-		timeval t = { 0, 0 };
+		timeval t = { 1, 0 };
 		int ret = select(sock_client + 1, &fdReads, NULL, NULL, &t);
 		if (ret < 0)
 		{
@@ -196,12 +235,8 @@ int main()
 			}
 		}
 
-		printf("空闲时间处理其它业务\n");
-		Login login;
-		strcpy_s(login.userName, sizeof(login.userName), "magic");
-		strcpy_s(login.passWord, sizeof(login.passWord), "rere2121");
-		send(sock_client, (char *)&login, sizeof(login), 0);
-		Sleep(1000);
+		//printf("空闲时间处理其它业务\n");
+
 	}
 
 	//7.关闭套接字 closesocket

@@ -222,7 +222,7 @@ int main()
 		0:没有满足的
 		-1:出错error
 		*/
-		timeval t = { 0,0 };
+		timeval t = { 1,0 };
 		int ret = select(sock_server + 1, &fdRead, &fdWrite, &fdExp, &t);
 		if (ret < 0)
 		{
@@ -269,7 +269,7 @@ int main()
 			}
 		}
 		
-		printf("空闲时间处理其他业务\n");
+		//printf("空闲时间处理其他业务\n");
 		
 	}
 
