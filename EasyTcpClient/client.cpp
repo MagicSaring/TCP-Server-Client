@@ -1,4 +1,4 @@
-#define WIN32_LEAN_AND_MEAN
+ï»¿#define WIN32_LEAN_AND_MEAN
 //#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 
@@ -71,27 +71,27 @@ struct LogoutResult : public DataHeader
 
 int main()
 {
-	WORD ver = MAKEWORD(2, 2);		//Éú³É°æ±¾ºÅ
+	WORD ver = MAKEWORD(2, 2);		//ç”Ÿæˆç‰ˆæœ¬å·
 	WSADATA data;
 
-	//Æô¶¯Windows socket 2.x»·¾³
+	//å¯åŠ¨Windows socket 2.xç¯å¢ƒ
 	if (WSAStartup(ver, &data) != 0)
 	{
-		printf("´íÎó,¼ÓÔØwinsock.dllÊ§°Ü...´íÎó´úÂë:%d", WSAGetLastError());
+		printf("é”™è¯¯,åŠ è½½winsock.dllå¤±è´¥...é”™è¯¯ä»£ç :%d", WSAGetLastError());
 		return 0;
 	}
 
-	// -- ÓÃSocket API½¨Á¢¼òÒ×TCP¿Í»§¶Ë
-	//1.´´½¨Ò»¸ösocketÌ×½Ó×Ö
+	// -- ç”¨Socket APIå»ºç«‹ç®€æ˜“TCPå®¢æˆ·ç«¯
+	//1.åˆ›å»ºä¸€ä¸ªsocketå¥—æ¥å­—
 	SOCKET sock_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sock_client == INVALID_SOCKET)
 	{
-		printf("´íÎó,½¨Á¢SocketÊ§°Ü...´íÎó´úÂë:%d", WSAGetLastError());
+		printf("é”™è¯¯,å»ºç«‹Socketå¤±è´¥...é”™è¯¯ä»£ç :%d", WSAGetLastError());
 		WSACleanup();
 		return 0;
 	}
-	printf("Socket½¨Á¢³É¹¦\n");
-	//2. Á¬½Ó·şÎñÆ÷ connect
+	printf("Socketå»ºç«‹æˆåŠŸ\n");
+	//2. è¿æ¥æœåŠ¡å™¨ connect
 	struct sockaddr_in server_addr; 
 	int addr_len = sizeof(struct sockaddr_in);
 
@@ -102,25 +102,25 @@ int main()
 	int ret = connect(sock_client, (struct sockaddr*)&server_addr, addr_len);
 	if (ret == SOCKET_ERROR)
 	{
-		printf("´íÎó,Á¬½Ó·şÎñÆ÷Ê§°Ü...´íÎó´úÂë:%d", WSAGetLastError());
+		printf("é”™è¯¯,è¿æ¥æœåŠ¡å™¨å¤±è´¥...é”™è¯¯ä»£ç :%d", WSAGetLastError());
 		closesocket(sock_client);
 		WSACleanup();
 		return 0;
 	}
 
-	printf("Á¬½Ó·şÎñÆ÷³É¹¦...\n");
+	printf("è¿æ¥æœåŠ¡å™¨æˆåŠŸ...\n");
 
 	while (true)
 	{
 		
-		//3. ÊäÈëÇëÇóÃüÁî
-		printf("ÇëÊäÈëÇëÇóÃüÁî\n");
+		//3. è¾“å…¥è¯·æ±‚å‘½ä»¤
+		printf("è¯·è¾“å…¥è¯·æ±‚å‘½ä»¤\n");
 		char cmdBuff[128] = { 0 };
 		scanf("%s", &cmdBuff);
-		//4.´¦ÀíÇëÇóÃüÁî
+		//4.å¤„ç†è¯·æ±‚å‘½ä»¤
 		if (0 == strcmp(cmdBuff, "exit"))
 		{
-			printf("ÊÕµ½exitÃüÁî,ÈÎÎñ½áÊø\n");
+			printf("æ”¶åˆ°exitå‘½ä»¤,ä»»åŠ¡ç»“æŸ\n");
 			break;
 		}
 		else if(0 == strcmp(cmdBuff, "login"))
@@ -131,7 +131,7 @@ int main()
 
 			send(sock_client, (char*)&login, sizeof(login), 0);
 
-			//½ÓÊÜ·şÎñÆ÷·µ»ØµÄÊı¾İ
+			//æ¥å—æœåŠ¡å™¨è¿”å›çš„æ•°æ®
 			LoginResult loginRet = {};
 			recv(sock_client, (char*)&loginRet, sizeof(loginRet), 0);
 
@@ -143,7 +143,7 @@ int main()
 			sprintf_s(logout.userName, sizeof(logout.userName), "magic");
 			send(sock_client, (char*)&logout, sizeof(logout), 0);
 
-			//½ÓÊÜ·şÎñÆ÷·µ»ØµÄÊı¾İ
+			//æ¥å—æœåŠ¡å™¨è¿”å›çš„æ•°æ®
 			LoginResult logoutRet = {};
 
 			recv(sock_client, (char*)&logoutRet, sizeof(logoutRet), 0);
@@ -153,14 +153,14 @@ int main()
 		}
 		else
 		{
-			printf("²»Ö§³ÖµÄÃüÁî,ÇëÖØĞÂÊäÈë.\n");
+			printf("ä¸æ”¯æŒçš„å‘½ä»¤,è¯·é‡æ–°è¾“å…¥.\n");
 		}
 	}
 
-	//7.¹Ø±ÕÌ×½Ó×Ö closesocket
+	//7.å…³é—­å¥—æ¥å­— closesocket
 	closesocket(sock_client);
 
-	//8.Çå³ıwindows socket»·¾³
+	//8.æ¸…é™¤windows socketç¯å¢ƒ
 	WSACleanup();
 	getchar();
 

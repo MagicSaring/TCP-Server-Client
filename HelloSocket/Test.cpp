@@ -1,4 +1,4 @@
-#define  WIN32_LEAN_AND_MEAN
+ï»¿#define  WIN32_LEAN_AND_MEAN
 
 #include <windows.h>
 #include <WinSock2.h>
@@ -7,7 +7,7 @@
 
 int main()
 {
-	WORD ver = MAKEWORD(2, 2);		//Éú³É°æ±¾ºÅ
+	WORD ver = MAKEWORD(2, 2);		//ç”Ÿæˆç‰ˆæœ¬å·
 	WSADATA dat;
 	WSAStartup(ver, &dat);
 
