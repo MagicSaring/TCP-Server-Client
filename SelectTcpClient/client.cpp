@@ -4,12 +4,17 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <WinSock2.h>
+#define mystrcpy(a,b) strcpy_s(a, sizeof(a), b);
+
 #else
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <string.h>
 #define	SOCKET					int
-#define	SOCKET_ERROR            (-1)
+#define INVALID_SOCKET  (SOCKET)(~0)
+#define SOCKET_ERROR            (-1)
+
+#define mystrcpy(a,b) strcpy(a, b);
 #endif 
 
 
@@ -96,7 +101,7 @@ int dealReadWirte(SOCKET s)
 	//缓冲区
 	char szRecv[1024];
 	// 5.接受客户端的请求数据
-	int nLen = recv(s, szRecv, sizeof(DataHeader), 0);
+	int nLen = (int)recv(s, szRecv, sizeof(DataHeader), 0);
 	if (nLen <= 0)
 	{
 		printf("与服务端断开连接,客户端<Socket=%d>已退出,任务结束\n",s);
@@ -155,15 +160,15 @@ void cmdThread(SOCKET s)
 		else if (0 == strcmp(cmdBuff, "login"))
 		{
 			Login login;
-			strcpy_s(login.userName, sizeof(login.userName), "magic");
-			strcpy_s(login.passWord, sizeof(login.passWord), "rere2121");
+			mystrcpy(login.userName, "magic");
+			mystrcpy(login.passWord, "rere2121");
 			send(s, (char*)&login, sizeof(login), 0);
 		}
 
 		else if (0 == strcmp(cmdBuff, "logout"))
 		{
 			Logout logout;
-			strcpy_s(logout.userName, sizeof(logout.userName), "magic");
+			mystrcpy(logout.userName, "magic");
 			send(s, (char*)&logout, sizeof(logout), 0);
 		}
 		else
@@ -175,6 +180,7 @@ void cmdThread(SOCKET s)
 
 int main()
 {
+#ifdef _WIN32
 	WORD ver = MAKEWORD(2, 2);		//生成版本号
 	WSADATA data;
 
@@ -184,14 +190,19 @@ int main()
 		printf("错误,加载winsock.dll失败...错误代码:%d", WSAGetLastError());
 		return 0;
 	}
+#endif // _WIN32
 
 	// -- 用Socket API建立简易TCP客户端
 	//1.创建一个socket套接字
 	SOCKET sock_client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sock_client == INVALID_SOCKET)
 	{
+#ifdef _WIN32
 		printf("错误,建立Socket失败...错误代码:%d", WSAGetLastError());
 		WSACleanup();
+#else
+		printf("错误,建立Socket失败.....");
+#endif
 		return 0;
 	}
 	printf("Socket建立成功\n");
@@ -201,14 +212,19 @@ int main()
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(4567);
-	server_addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	server_addr.sin_addr.s_addr = inet_addr("192.168.0.108");
 
 	int ret = connect(sock_client, (struct sockaddr*)&server_addr, addr_len);
 	if (ret == SOCKET_ERROR)
 	{
+#ifdef _WIN32
 		printf("错误,连接服务器失败...错误代码:%d", WSAGetLastError());
 		closesocket(sock_client);
 		WSACleanup();
+#else
+		printf("错误,连接服务器失败...");
+		close(sock_client);
+#endif // _WIN32
 		return 0;
 	}
 
@@ -243,17 +259,18 @@ int main()
 				break;
 			}
 		}
-
 		//printf("空闲时间处理其它业务\n");
-
 	}
 
+#ifdef _WIN32
 	//7.关闭套接字 closesocket
 	closesocket(sock_client);
-
 	//8.清除windows socket环境
 	WSACleanup();
-	getchar();
+#else
+	//7.关闭套接字 closesocket
+	close(sock_client);
+#endif // _WIN32
 
 	return 0;
 }
