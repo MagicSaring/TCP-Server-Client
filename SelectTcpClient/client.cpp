@@ -1,10 +1,12 @@
-﻿#define WIN32_LEAN_AND_MEAN
+﻿
 //#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <WinSock2.h>
 #define mystrcpy(a,b) strcpy_s(a, sizeof(a), b);
+#pragma comment(lib, "WS2_32.LIB")
 
 #else
 #include <unistd.h>
@@ -21,7 +23,7 @@
 #include <stdio.h>
 #include <thread>
 
-#pragma comment(lib, "WS2_32.LIB")
+
 
 enum CMD
 {
@@ -187,7 +189,7 @@ int main()
 	//启动Windows socket 2.x环境
 	if (WSAStartup(ver, &data) != 0)
 	{
-		printf("错误,加载winsock.dll失败...错误代码:%d", WSAGetLastError());
+		printf("错误,加载winsock.dll失败...错误代码:%d\n", WSAGetLastError());
 		return 0;
 	}
 #endif // _WIN32
@@ -198,10 +200,10 @@ int main()
 	if (sock_client == INVALID_SOCKET)
 	{
 #ifdef _WIN32
-		printf("错误,建立Socket失败...错误代码:%d", WSAGetLastError());
+		printf("错误,建立Socket失败...错误代码:%d\n", WSAGetLastError());
 		WSACleanup();
 #else
-		printf("错误,建立Socket失败.....");
+		printf("错误,建立Socket失败.....\n");
 #endif
 		return 0;
 	}
@@ -212,17 +214,17 @@ int main()
 
 	server_addr.sin_family = AF_INET;
 	server_addr.sin_port = htons(4567);
-	server_addr.sin_addr.s_addr = inet_addr("192.168.0.108");
+	server_addr.sin_addr.s_addr = inet_addr("192.168.40.99");
 
 	int ret = connect(sock_client, (struct sockaddr*)&server_addr, addr_len);
 	if (ret == SOCKET_ERROR)
 	{
 #ifdef _WIN32
-		printf("错误,连接服务器失败...错误代码:%d", WSAGetLastError());
+		printf("错误,连接服务器失败...错误代码:%d\n", WSAGetLastError());
 		closesocket(sock_client);
 		WSACleanup();
 #else
-		printf("错误,连接服务器失败...");
+		printf("错误,连接服务器失败...\n");
 		close(sock_client);
 #endif // _WIN32
 		return 0;

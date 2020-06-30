@@ -1,15 +1,27 @@
-﻿#define WIN32_LEAN_AND_MEAN
-//#define _WINSOCK_DEPRECATED_NO_WARNINGS
-
-
-#include <windows.h>
-#include <WinSock2.h>
-#include <stdio.h>
-#include <vector>
+﻿//#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 using namespace std;
+#include <stdio.h>
+#include <vector>
+#include <algorithm>
 
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <WinSock2.h>
 #pragma comment(lib, "WS2_32.LIB")
+
+#else
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <string.h>
+#define	SOCKET					int
+#define INVALID_SOCKET  (SOCKET)(~0)
+#define SOCKET_ERROR            (-1)
+
+#endif 
+
+
 
 enum CMD
 {
@@ -137,6 +149,7 @@ int dealReadWirte(SOCKET s)
 
 int main()
 {
+#ifdef _WIN32
 	WORD ver = MAKEWORD(2, 2);		//生成版本号
 	WSADATA data;
 
@@ -146,14 +159,19 @@ int main()
 		printf("错误,加载winsock.dll失败...错误代码:%d", WSAGetLastError());
 		return 0;
 	}
+#endif // _WIN32
 
 	// -- 用Socket API建立简易TCP服务器
 	//1.创建一个socket套接字
 	SOCKET sock_server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (sock_server == INVALID_SOCKET)
 	{
+#ifdef _WIN32
 		printf("错误,建立Socket失败...错误代码:%d", WSAGetLastError());
 		WSACleanup();
+#else
+		printf("错误,建立Socket失败...\n");
+#endif // _WIN32
 		return 0;
 	}
 
@@ -161,14 +179,20 @@ int main()
 	struct sockaddr_in server_addr = {};
 	int addr_len = sizeof(struct sockaddr_in);
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(4567);
+	server_addr.sin_port = htons(6666);
 	server_addr.sin_addr.s_addr = INADDR_ANY;
 
 	if (SOCKET_ERROR == bind(sock_server, (struct sockaddr*)&server_addr, addr_len))
 	{
+#ifdef _WIN32
 		printf("错误,绑定用于接受客户端连接的网络接口失败...错误代码:%d\n", WSAGetLastError());
 		closesocket(sock_server);
 		WSACleanup();
+#else
+		printf("错误,绑定用于接受客户端连接的网络接口失败...\n");
+		close(sock_server);
+#endif // _WIN32
+
 		return 0;
 	}
 
@@ -177,9 +201,16 @@ int main()
 	//3.listen 监听网络端口
 	if (SOCKET_ERROR == listen(sock_server, 5))
 	{
+#ifdef _WIN32
 		printf("错误,监听网络端口失败...错误代码:%d\n", WSAGetLastError());
 		closesocket(sock_server);
 		WSACleanup();
+#else
+		printf("错误,监听网络端口失败...\n");
+		close(sock_server);
+#endif // _WIN32
+
+		return 0;
 	}
 
 	printf("监听网络端口成功...\n");
@@ -201,9 +232,15 @@ int main()
 		FD_SET(sock_server, &fdWrite);
 		FD_SET(sock_server, &fdExp);
 
+		//SOCKET maxSocket = sock_server;
+
 		for (size_t i = 0; i < g_clients.size(); ++i)
 		{
 			FD_SET(g_clients[i], &fdRead);
+			//if (g_clients[i] > maxSocket)
+			//{
+			//	maxSocket = g_clients[i];
+			//}
 		}
 
 		/*
@@ -223,6 +260,7 @@ int main()
 		-1:出错error
 		*/
 		timeval t = { 1,0 };
+		//int ret = select(maxSocket + 1, &fdRead, &fdWrite, &fdExp, &t);
 		int ret = select(sock_server + 1, &fdRead, &fdWrite, &fdExp, &t);
 		if (ret < 0)
 		{
@@ -239,11 +277,23 @@ int main()
 			//4.accept 等待接受客户端连接
 			struct sockaddr_in client_addr = {};
 			SOCKET new_socket = INVALID_SOCKET;
+
+#ifdef _WIN32
 			new_socket = accept(sock_server, (struct sockaddr*)&client_addr, &addr_len);
+#else
+			new_socket = accept(sock_server, (struct sockaddr*)&client_addr, (socklen_t*)&addr_len);
+#endif // _WIN32
+
+			
 			if (new_socket == INVALID_SOCKET)
 			{
+#ifdef _WIN32
 				printf("错误,接受到无效客户端Socket...错误代码:%d\n", WSAGetLastError());
 				closesocket(new_socket);
+#else		
+				printf("错误,接受到无效客户端Socket\n");
+				close(new_socket);
+#endif // _WIN32
 				continue;
 			}
 
@@ -257,6 +307,22 @@ int main()
 			g_clients.push_back(new_socket);
 			printf("新客户端加入: Socket = %d, IP = %s\n", new_socket, inet_ntoa(client_addr.sin_addr));
 		}
+
+		//for (size_t i = 0; i < g_clients.size(); ++i)
+		//{
+		//	if (FD_ISSET(g_clients[i], &fdRead))
+		//	{
+		//		if (-1 == dealReadWirte(g_clients[i]))
+		//		{
+		//			auto iter = find(g_clients.begin(), g_clients.end(), g_clients[i]);
+		//			if (iter != g_clients.end())
+		//			{
+		//				g_clients.erase(iter);
+		//			}
+		//		}
+		//	}
+		//}
+
 		for (size_t i = 0; i < fdRead.fd_count; ++i)
 		{
 			if (-1 == dealReadWirte(fdRead.fd_array[i]))
@@ -273,6 +339,7 @@ int main()
 		
 	}
 
+#ifdef _WIN32
 	//7.closesocket 关闭套接字
 	for (size_t i = 0; i < g_clients.size(); ++i)
 	{
@@ -281,6 +348,14 @@ int main()
 
 	//清除Windows socket环境
 	WSACleanup();
+#else
+	for (size_t i = 0; i < g_clients.size(); ++i)
+	{
+		close(g_clients[i]);
+	}
+#endif // _WIN32
+
+
 	printf("已退出,任务结束\n");
 	getchar();
 
