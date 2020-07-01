@@ -41,7 +41,7 @@ public:
 	int Connect(const char* ip, short port);	//连接服务器
 	void Close();	//关闭socket
 	int RecvData();	//收数据
-	void OnNetMsg(DataHeader *header);
+	void OnNetMsg(DataHeader *header);	//处理网络消息
 	int SendData(DataHeader* header);	//发送数据
 	bool OnRun();	//处理网络消息
 	bool isRun();	//是否运行中
