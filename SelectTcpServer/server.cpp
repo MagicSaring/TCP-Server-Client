@@ -4,6 +4,7 @@ using namespace std;
 #include <stdio.h>
 #include <vector>
 #include <algorithm>
+#define  PORT 4567
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -101,7 +102,7 @@ vector<SOCKET> g_clients;
 int dealReadWirte(SOCKET s)
 {
 	//缓冲区
-	char szRecv[1024];
+	char szRecv[4096];
 	// 5.接受客户端的请求数据
 	int nLen = recv(s, szRecv, sizeof(DataHeader), 0);
 	if (nLen <= 0)
@@ -179,7 +180,7 @@ int main()
 	struct sockaddr_in server_addr = {};
 	int addr_len = sizeof(struct sockaddr_in);
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(6666);
+	server_addr.sin_port = htons(PORT);
 	server_addr.sin_addr.s_addr = INADDR_ANY;
 
 	if (SOCKET_ERROR == bind(sock_server, (struct sockaddr*)&server_addr, addr_len))
@@ -196,7 +197,7 @@ int main()
 		return 0;
 	}
 
-	printf("绑定网络端口成功\n");
+	printf("绑定网络端口成功,port:%d\n", PORT);
 
 	//3.listen 监听网络端口
 	if (SOCKET_ERROR == listen(sock_server, 5))
@@ -232,15 +233,15 @@ int main()
 		FD_SET(sock_server, &fdWrite);
 		FD_SET(sock_server, &fdExp);
 
-		//SOCKET maxSocket = sock_server;
+		SOCKET maxSocket = sock_server;
 
 		for (size_t i = 0; i < g_clients.size(); ++i)
 		{
 			FD_SET(g_clients[i], &fdRead);
-			//if (g_clients[i] > maxSocket)
-			//{
-			//	maxSocket = g_clients[i];
-			//}
+			if (g_clients[i] > maxSocket)
+			{
+				maxSocket = g_clients[i];
+			}
 		}
 
 		/*
@@ -260,8 +261,7 @@ int main()
 		-1:出错error
 		*/
 		timeval t = { 1,0 };
-		//int ret = select(maxSocket + 1, &fdRead, &fdWrite, &fdExp, &t);
-		int ret = select(sock_server + 1, &fdRead, &fdWrite, &fdExp, &t);
+		int ret = select(maxSocket + 1, &fdRead, &fdWrite, &fdExp, &t);
 		if (ret < 0)
 		{
 			printf("select任务结束\n");
@@ -308,32 +308,32 @@ int main()
 			printf("新客户端加入: Socket = %d, IP = %s\n", new_socket, inet_ntoa(client_addr.sin_addr));
 		}
 
-		//for (size_t i = 0; i < g_clients.size(); ++i)
-		//{
-		//	if (FD_ISSET(g_clients[i], &fdRead))
-		//	{
-		//		if (-1 == dealReadWirte(g_clients[i]))
-		//		{
-		//			auto iter = find(g_clients.begin(), g_clients.end(), g_clients[i]);
-		//			if (iter != g_clients.end())
-		//			{
-		//				g_clients.erase(iter);
-		//			}
-		//		}
-		//	}
-		//}
-
-		for (size_t i = 0; i < fdRead.fd_count; ++i)
+		for (size_t i = 0; i < g_clients.size(); ++i)
 		{
-			if (-1 == dealReadWirte(fdRead.fd_array[i]))
+			if (FD_ISSET(g_clients[i], &fdRead))
 			{
-				auto iter = find(g_clients.begin(), g_clients.end(), fdRead.fd_array[i]);
-				if (iter != g_clients.end())
+				if (-1 == dealReadWirte(g_clients[i]))
 				{
-					g_clients.erase(iter);
+					auto iter = find(g_clients.begin(), g_clients.end(), g_clients[i]);
+					if (iter != g_clients.end())
+					{
+						g_clients.erase(iter);
+					}
 				}
 			}
 		}
+
+		//for (size_t i = 0; i < fdRead.fd_count; ++i)
+		//{
+		//	if (-1 == dealReadWirte(fdRead.fd_array[i]))
+		//	{
+		//		auto iter = find(g_clients.begin(), g_clients.end(), fdRead.fd_array[i]);
+		//		if (iter != g_clients.end())
+		//		{
+		//			g_clients.erase(iter);
+		//		}
+		//	}
+		//}
 		
 		//printf("空闲时间处理其他业务\n");
 		
