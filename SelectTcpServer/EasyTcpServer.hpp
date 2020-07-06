@@ -24,6 +24,49 @@ using namespace std;
 
 #endif 
 
+#include <thread>
+
+#ifndef RECV_BUFF_SIZE
+#define  RECV_BUFF_SIZE 10240
+#endif // !RECV_BUFF_SIZE
+
+class ClientSocket
+{
+public:
+	ClientSocket(SOCKET sockfd = INVALID_SOCKET)
+	{
+		_sockfd = sockfd;
+		memset(_szMsgBuf, 0, sizeof(_szMsgBuf));
+		_lastPos = 0;
+	}
+	SOCKET sockfd()
+	{
+		return _sockfd;
+	}
+	char* msgBuf()
+	{
+		return _szMsgBuf;
+	}
+	int getLastPos()
+	{
+		return _lastPos;
+	}
+
+	void setLastPos(int pos)
+	{
+		_lastPos = pos;
+	}
+
+private:
+	SOCKET _sockfd;	//文件描述符
+
+	//第二缓冲区,消息缓冲区
+	char _szMsgBuf[RECV_BUFF_SIZE * 10];
+
+	//消息缓冲区的数据尾部位置
+	int _lastPos;
+};
+
 class EasyTcpServer
 {
 public:
@@ -40,7 +83,7 @@ public:
 	SOCKET InitSocket();
 
 	//绑定IP和端口号
-	int Bind(const char *ip, unsigned short port);
+	int Bind(const char* ip, unsigned short port);
 
 	//监听端口号
 	int Listen(int n);
@@ -58,20 +101,20 @@ public:
 	bool IsRun();
 
 	//接收数据,处理粘包,拆分包
-	int RecvData(SOCKET _sock);
+	int RecvData(ClientSocket* pClient);
 
 	//响应网络消息
-	int OnNetMsg(SOCKET _sock, DataHeader* header);
+	int OnNetMsg(SOCKET sock, DataHeader* header);
 
 	//发送指定数据
-	int SendData(SOCKET _sock, DataHeader* header);
+	int SendData(SOCKET sock, DataHeader* header);
 
 	//群发数据
 	int BatchSendData(DataHeader* header);
 
 private:
 	SOCKET m_hSocket;
-	vector<SOCKET> g_clients;
+	vector<ClientSocket*> _clients;
 };
 
 SOCKET EasyTcpServer::InitSocket()
@@ -87,7 +130,6 @@ SOCKET EasyTcpServer::InitSocket()
 		return INVALID_SOCKET;
 	}
 #endif // _WIN32
-
 
 	if (INVALID_SOCKET != m_hSocket)
 	{
@@ -133,14 +175,14 @@ int EasyTcpServer::Bind(const char* ip, unsigned short port)
 	if (SOCKET_ERROR == ret)
 	{
 #ifdef _WIN32
-		printf("错误,<Socket=%d>绑定用于接受客户端连接的网络接口失败...错误代码:%d\n", (int)m_hSocket, WSAGetLastError());
+		printf("错误,<Socket=%d>绑定用于接受客户端连接的网络端口<%d>失败...错误代码:%d\n", (int)m_hSocket, port, WSAGetLastError());
 #else
-		printf("错误,<Socket=%d>绑定用于接受客户端连接的网络接口失败...\n", m_hSocket);
+		printf("错误,<Socket=%d>绑定用于接受客户端连接的网络接口<%d>失败...\n", (int)m_hSocket, port);
 #endif // _WIN32
 	}
 	else
 	{
-		printf("<Socket=%d>绑定网络端口成功,port:%d\n", (int)m_hSocket, port);
+		printf("<Socket=%d>绑定网络端口<%d>成功\n", (int)m_hSocket, port);
 	}
 
 	return ret;
@@ -154,7 +196,7 @@ int EasyTcpServer::Listen(int n)
 #ifdef _WIN32
 		printf("错误,<Socket=%d>监听网络端口失败...错误代码:%d\n", (int)m_hSocket, WSAGetLastError());
 #else
-		printf("错误,<Socket=%d>监听网络端口失败...\n", m_hSocket);
+		printf("错误,<Socket=%d>监听网络端口失败...\n", (int)m_hSocket);
 #endif // _WIN32
 
 	}
@@ -183,14 +225,14 @@ SOCKET EasyTcpServer::Accept()
 #ifdef _WIN32
 		printf("错误,<Socket=%d>接受到无效客户端Socket...错误代码:%d\n", (int)m_hSocket, WSAGetLastError());
 #else		
-		printf("错误,接受到无效客户端Socket\n");
+		printf("错误,<Socket=%d>接受到无效客户端Socket\n", (int)m_hSocket);
 #endif // _WIN32
 	}
 	else
 	{
 		NewUserJoin userJoin;
 		BatchSendData(&userJoin);
-		g_clients.push_back(new_socket);
+		_clients.push_back(new ClientSocket(new_socket));
 		printf("<Socket=%d>新客户端加入: Socket = %d, IP = %s\n", (int)m_hSocket, (int)new_socket, inet_ntoa(client_addr.sin_addr));
 	}
 
@@ -202,9 +244,10 @@ int EasyTcpServer::Close()
 	if (m_hSocket != INVALID_SOCKET)
 	{
 #ifdef _WIN32
-		for (size_t i = 0; i < g_clients.size(); ++i)
+		for (size_t i = 0; i < _clients.size(); ++i)
 		{
-			closesocket(g_clients[i]);
+			closesocket(_clients[i]->sockfd());
+			delete _clients[i];
 		}
 
 		closesocket(m_hSocket);
@@ -212,13 +255,16 @@ int EasyTcpServer::Close()
 		//清除Windows socket环境
 		WSACleanup();
 #else
-		for (size_t i = 0; i < g_clients.size(); ++i)
+		for (size_t i = 0; i < _clients.size(); ++i)
 		{
-			close(g_clients[i]);
+			close(_clients[i]->sockfd());
+			delete _clients[i];
 		}
 
 		close(m_hSocket);
 #endif // _WIN32
+
+		_clients.clear();
 	}
 
 	return 0;
@@ -245,12 +291,12 @@ bool EasyTcpServer::OnRun()
 
 		SOCKET maxSocket = m_hSocket;
 
-		for (size_t i = 0; i < g_clients.size(); ++i)
+		for (size_t i = 0; i < _clients.size(); ++i)
 		{
-			FD_SET(g_clients[i], &fdRead);
-			if (g_clients[i] > maxSocket)
+			FD_SET(_clients[i]->sockfd(), &fdRead);
+			if (_clients[i]->sockfd() > maxSocket)
 			{
-				maxSocket = g_clients[i];
+				maxSocket = _clients[i]->sockfd();
 			}
 		}
 
@@ -272,6 +318,7 @@ bool EasyTcpServer::OnRun()
 		*/
 		timeval t = { 1,0 };
 		int ret = select(maxSocket + 1, &fdRead, &fdWrite, &fdExp, &t);
+		/*printf("select ret = %d count = %d\n", ret, count ++);*/
 		if (ret < 0)
 		{
 			printf("select任务结束\n");
@@ -288,16 +335,17 @@ bool EasyTcpServer::OnRun()
 			Accept();
 		}
 
-		for (size_t i = 0; i < g_clients.size(); ++i)
+		for (size_t i = 0; i < _clients.size(); ++i)
 		{
-			if (FD_ISSET(g_clients[i], &fdRead))
+			if (FD_ISSET(_clients[i]->sockfd(), &fdRead))
 			{
-				if (-1 == RecvData(g_clients[i]))
+				if (-1 == RecvData(_clients[i]))
 				{
-					auto iter = find(g_clients.begin(), g_clients.end(), g_clients[i]);
-					if (iter != g_clients.end())
+					auto iter = find(_clients.begin(), _clients.end(), _clients[i]);
+					if (iter != _clients.end())
 					{
-						g_clients.erase(iter);
+						delete _clients[i];
+						_clients.erase(iter);
 					}
 				}
 			}
@@ -312,52 +360,82 @@ bool EasyTcpServer::IsRun()
 	return m_hSocket != INVALID_SOCKET;
 }
 
-int EasyTcpServer::RecvData(SOCKET _sock)
+int EasyTcpServer::RecvData(ClientSocket* pClient)
 {
-	//缓冲区
-	char szRecv[4096];
+	char _szRecv[RECV_BUFF_SIZE] = {0};
+
 	// 5.接受客户端的请求数据
-	int nLen = recv(_sock, szRecv, sizeof(DataHeader), 0);
+	int nLen = (int)recv(pClient->sockfd(), _szRecv, sizeof(_szRecv), 0);
 	if (nLen <= 0)
 	{
-		printf("客户端<Socket=%d>已退出,任务结束\n", (int)_sock);
+		printf("客户端<Socket=%d>已退出,任务结束\n", (int)pClient->sockfd());
 		return -1;
 	}
 
-	DataHeader* header = (DataHeader*)szRecv;
+	//将收取到的数据拷贝到消息缓冲区
+	memcpy(pClient->msgBuf() + pClient->getLastPos(), _szRecv, nLen);
 
-	recv(_sock, szRecv + sizeof(DataHeader), header->dataLength - sizeof(DataHeader), 0);
-	OnNetMsg(_sock, header);
+	//消息缓冲区的数据尾部位置后移
+	pClient->setLastPos(pClient->getLastPos() + nLen);
+
+	//判断消息缓冲区的数据长度大于消息头DataHeader长度
+	while (pClient->getLastPos() >= sizeof(DataHeader))
+	{
+		DataHeader* header = (DataHeader*)pClient->msgBuf();
+
+		//判断消息缓冲区的数据长度大于消息长度
+		if (pClient->getLastPos() >= header->dataLength)
+		{
+			//消息缓冲区剩余未处理数据的长度
+			int nSize = pClient->getLastPos() - header->dataLength;
+
+			//处理网络消息
+			OnNetMsg(pClient->sockfd(), header);
+
+			//将消息缓冲区剩余未处理数据前移
+			memcpy(pClient->msgBuf(), pClient->msgBuf() + header->dataLength, nSize);
+
+			//消息缓冲区的数据尾部位置前移
+			pClient->setLastPos(nSize);
+		}
+		else
+		{
+			//消息缓冲区剩余数据不够一条完整消息
+			break;
+		}
+	}
 
 	return 0;
 }
 
-int EasyTcpServer::OnNetMsg(SOCKET _sock, DataHeader* header)
+int EasyTcpServer::OnNetMsg(SOCKET sock, DataHeader* header)
 {
 	switch (header->cmd)
 	{
 	case CMD_LOGIN:
 	{
 		Login* login = (Login*)header;
-		printf("收到客户端<Socket=%d>命令:CMD_LOGIN, 数据长度;%d\n", (int)_sock, login->dataLength);
-		printf("用户登录...用户姓名:%s, 密码:%s\n", login->userName, login->passWord);
+		//printf("收到客户端<Socket=%d>命令:CMD_LOGIN, 数据长度;%d\n", (int)sock, login->dataLength);
+		//printf("用户登录...用户姓名:%s, 密码:%s\n", login->userName, login->passWord);
 
 		LoginResult ret;
-		send(_sock, (char*)&ret, sizeof(ret), 0);
+		SendData(sock, &ret);
 	}break;
 	case CMD_LOGOUT:
 	{
 		Logout* logout = (Logout*)header;
-		printf("收到客户端<Socket=%d>命令:CMD_LOGOUT, 数据长度;%d\n", (int)_sock, logout->dataLength);
-		printf("用户登出...用户姓名:%s\n", logout->userName);
+		//printf("收到客户端<Socket=%d>命令:CMD_LOGOUT, 数据长度;%d\n", (int)sock, logout->dataLength);
+		//printf("用户登出...用户姓名:%s\n", logout->userName);
 
 		LogoutResult ret;
-		send(_sock, (char*)&ret, sizeof(ret), 0);
+		SendData(sock, &ret);
 	}break;
 	default:
 	{
-		DataHeader header = { CMD_ERROR , 0 };
-		send(_sock, (char*)&header, sizeof(header), 0);
+		printf("收到客户端<Socket=%d>未定义消息, 数据长度:%d\n", (int)sock, header->dataLength);
+
+		//DataHeader ret;
+		//SendData(sock, &ret);
 
 	}break;
 	}
@@ -365,11 +443,11 @@ int EasyTcpServer::OnNetMsg(SOCKET _sock, DataHeader* header)
 	return 0;
 }
 
-int EasyTcpServer::SendData(SOCKET _sock, DataHeader* header)
+int EasyTcpServer::SendData(SOCKET sock, DataHeader* header)
 {
 	if (IsRun() && header)
 	{
-		return send(_sock, (const char*)&header, header->dataLength, 0);
+		return send(sock, (const char*)header, header->dataLength, 0);
 	}
 
 	return SOCKET_ERROR;
@@ -379,11 +457,11 @@ int EasyTcpServer::BatchSendData(DataHeader* header)
 {
 	if (IsRun() && header)
 	{
-		for (size_t i = 0; i < g_clients.size(); ++i)
+		for (size_t i = 0; i < _clients.size(); ++i)
 		{
-			if (SendData(g_clients[i], header) == SOCKET_ERROR)
+			if (SendData(_clients[i]->sockfd(), header) == SOCKET_ERROR)
 			{
-				printf("<Socket=%d>发送数据失败\n", g_clients[i]);
+				printf("<Socket=%d>发送数据失败\n", _clients[i]->sockfd());
 			}
 		}
 	}

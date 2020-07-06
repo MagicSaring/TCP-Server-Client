@@ -23,6 +23,9 @@
 #include <thread>
 #include "MessageHeader.hpp"
 
+#ifndef RECV_BUFF_SIZE
+#define  RECV_BUFF_SIZE 10240
+#endif // !RECV_BUFF_SIZE
 
 class EasyTcpClient
 {
@@ -30,6 +33,9 @@ public:
 	EasyTcpClient()
 	{
 		m_hSocket = INVALID_SOCKET;
+		memset(_szRecv, 0, sizeof(_szRecv));
+		memset(_szMsgBuf, 0, sizeof(_szMsgBuf));
+		_lastPos = 0;
 	}
 	//虚析构函数
 	virtual ~EasyTcpClient()
@@ -40,7 +46,7 @@ public:
 	int InitSocket();	//初始化socket
 	int Connect(const char* ip, short port);	//连接服务器
 	void Close();	//关闭socket
-	int RecvData();	//收数据
+	int RecvData(SOCKET _sock);		//接收数据,处理粘包,拆分包
 	void OnNetMsg(DataHeader *header);	//处理网络消息
 	int SendData(DataHeader* header);	//发送数据
 	bool OnRun();	//处理网络消息
@@ -49,6 +55,14 @@ public:
 private:
 	SOCKET m_hSocket;
 
+	//接收缓冲区
+	char _szRecv[RECV_BUFF_SIZE] = {};
+
+	//第二缓冲区,消息缓冲区
+	char _szMsgBuf[RECV_BUFF_SIZE * 10] = {};
+
+	//消息缓冲区的数据尾部位置
+	int _lastPos = 0;
 };
 
 int EasyTcpClient::InitSocket()
@@ -114,7 +128,7 @@ int EasyTcpClient::Connect(const char* ip, short port)
 		closesocket(m_hSocket);
 		WSACleanup();
 #else
-		printf("错误,连接服务器失败...\n");
+		printf("错误,Socket=<%d>连接服务器<ip:%s,port:%d>失败...\n",m_hSocket, ip, port);
 		close(m_hSocket);
 #endif // _WIN32
 	}
@@ -144,26 +158,52 @@ void EasyTcpClient::Close()
 }
 
 //接收数据,处理粘包,拆分包
-int EasyTcpClient::RecvData()
+int EasyTcpClient::RecvData(SOCKET _sock)
 {
-	//缓冲区
-	char szRecv[4096] = {0};
-
 	// 5.接受客户端的请求数据
-	int nLen = (int)recv(m_hSocket, szRecv, sizeof(DataHeader), 0);
+	int nLen = (int)recv(_sock, _szRecv, sizeof(_szRecv), 0);
 	if (nLen <= 0)
 	{
-		printf("与服务端断开连接,客户端<Socket=%d>已退出,任务结束\n", m_hSocket);
-		Close();
+		printf("与服务端断开连接,客户端<Socket=%d>已退出,任务结束\n", (int)_sock);
 		return -1;
 	}
 
-	DataHeader* header = (DataHeader*)szRecv;
-	recv(m_hSocket, szRecv + sizeof(DataHeader), header->dataLength - sizeof(DataHeader), 0);
-	OnNetMsg(header);
+	//将收取到的数据拷贝到消息缓冲区
+	memcpy(_szMsgBuf + _lastPos, _szRecv, nLen);
+
+	//消息缓冲区的数据尾部位置后移
+	_lastPos += nLen;
+
+	//判断消息缓冲区的数据长度大于消息头DataHeader长度
+	while (_lastPos >= sizeof(DataHeader))
+	{
+		DataHeader* header = (DataHeader*)_szMsgBuf;
+
+		//判断消息缓冲区的数据长度大于消息长度
+		if (_lastPos >= header->dataLength)
+		{
+			//消息缓冲区剩余未处理数据的长度
+			int nSize = _lastPos - header->dataLength;
+
+			//处理网络消息
+			OnNetMsg(header);
+
+			//将消息缓冲区剩余未处理数据前移
+			memcpy(_szMsgBuf, _szMsgBuf + header->dataLength, nSize);
+
+			//消息缓冲区的数据尾部位置前移
+			_lastPos = nSize;
+		}
+		else
+		{
+			//消息缓冲区剩余数据不够一条完整消息
+			break;
+		}
+	}
 
 	return 0;
 }
+
 
 //响应
 void EasyTcpClient::OnNetMsg(DataHeader* header)
@@ -173,25 +213,29 @@ void EasyTcpClient::OnNetMsg(DataHeader* header)
 	case CMD_LOGIN_RESULT:
 	{
 		LoginResult* loginRet = (LoginResult*)header;
-		printf("客户端<Socket=%d>收到服务端消息命令:CMD_LOGIN_RESULT, 数据长度:%d\n", m_hSocket, loginRet->dataLength);
-		printf("LoginResult:%d\n", loginRet->result);
-
+		//printf("客户端<Socket=%d>收到服务端消息命令:CMD_LOGIN_RESULT, 数据长度:%d\n", (int)m_hSocket, loginRet->dataLength);
+		//printf("LoginResult:%d\n", loginRet->result);
 	}break;
 	case CMD_LOGOUT_RESULT:
 	{
 		LogoutResult* logoutRet = (LogoutResult*)header;
-
-		printf("客户端<Socket=%d>收到服务端消息命令:CMD_LOGOUT_RESULT, 数据长度:%d\n", m_hSocket, logoutRet->dataLength);
-		printf("LogoutResult:%d\n", logoutRet->result);
-
+		//printf("客户端<Socket=%d>收到服务端消息命令:CMD_LOGOUT_RESULT, 数据长度:%d\n", (int)m_hSocket, logoutRet->dataLength);
+		//printf("LogoutResult:%d\n", logoutRet->result);
 	}break;
 	case CMD_NEW_USER_JOIN:
 	{
 		NewUserJoin* userJoin = (NewUserJoin*)header;
-
-		printf("客户端<Socket=%d>收到服务端消息命令:CMD_NEW_USER_JOIN, 数据长度:%d\n", m_hSocket, userJoin->dataLength);
-		printf("sock:%d\n", userJoin->sock);
+		//printf("客户端<Socket=%d>收到服务端消息命令:CMD_NEW_USER_JOIN, 数据长度:%d\n", (int)m_hSocket, userJoin->dataLength);
+		//printf("sock:%d\n", userJoin->sock);
 	}break;
+	case CMD_ERROR:
+	{
+		printf("客户端<Socket=%d>收到服务端消息命令:CMD_ERROR, 数据长度:%d\n", (int)m_hSocket, header->dataLength);
+	}break;
+	default:
+	{
+		printf("客户端<Socket=%d>收到未定义消息, 数据长度:%d\n", (int)m_hSocket, header->dataLength);
+	}
 	}
 }
 
@@ -230,7 +274,7 @@ bool EasyTcpClient::OnRun()
 		*/
 
 		timeval t = { 0, 0 };
-		int ret = select(m_hSocket + 1, &fdReads, NULL, NULL, &t);
+		int ret = select(m_hSocket + 1, &fdReads, 0, 0, &t);
 		if (ret < 0)
 		{
 			printf("客户端<Socket=%d>select任务结束\n", m_hSocket);
@@ -244,7 +288,7 @@ bool EasyTcpClient::OnRun()
 			//FD_CLR:将一个文件描述符从集合中移除
 			FD_CLR(m_hSocket, &fdReads);
 
-			if (-1 == RecvData())
+			if (-1 == RecvData(m_hSocket))
 			{
 				printf("客户端<Socket=%d>select任务结束\n", m_hSocket);
 				Close();

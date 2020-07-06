@@ -1,6 +1,8 @@
 ﻿#ifndef _MessageHeader_hpp_
 #define _MessageHeader_hpp_
 
+#include <string.h>
+
 enum CMD
 {
 	CMD_LOGIN = 1,
@@ -12,6 +14,11 @@ enum CMD
 };
 struct DataHeader
 {
+	DataHeader()
+	{
+		cmd = CMD_ERROR;
+		dataLength = sizeof(DataHeader);
+	}
 	short cmd;
 	short dataLength;
 };
@@ -28,6 +35,7 @@ struct Login : public DataHeader
 	}
 	char userName[32];
 	char passWord[32];
+	char data[932];
 };
 
 struct LoginResult : public DataHeader
@@ -39,6 +47,7 @@ struct LoginResult : public DataHeader
 		result = 0;
 	}
 	int result;
+	char data[992];
 };
 
 struct Logout : public DataHeader
