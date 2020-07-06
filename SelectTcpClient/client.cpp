@@ -25,20 +25,27 @@ void cmdThread()
 
 int main()
 {
-	const int cCount = FD_SETSIZE - 1;
+	//const int cCount = FD_SETSIZE - 1;
+	const int cCount = 10000;
 	EasyTcpClient *client[cCount];
 
 	for (int i = 0; i < cCount; ++i)
 	{
+		if (!g_bRun)
+		{
+			return 0;
+		}
 		client[i] = new EasyTcpClient();
 	}
 
 	for (int i = 0; i < cCount; ++i)
 	{
-		if (client[i]->Connect("127.0.0.1", 4567) == SOCKET_ERROR)
+		if (!g_bRun || client[i]->Connect("127.0.0.1", 4567) == SOCKET_ERROR)
 		{
 			return 0;
 		}
+
+		printf("Connect=%d\n", i);
 	}
 
 	Login login;
@@ -65,7 +72,6 @@ int main()
 	}
 
 	printf("已退出..\n");
-	//getchar();
 
 	return 0;
 }

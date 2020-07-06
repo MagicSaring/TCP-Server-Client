@@ -3,6 +3,7 @@
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#define FD_SETSIZE      10240
 #include <windows.h>
 #include <WinSock2.h>
 #define mystrcpy(a,b) strcpy_s(a, sizeof(a), b);
@@ -97,7 +98,7 @@ int EasyTcpClient::InitSocket()
 #endif
 		return -1;
 	}
-	printf("建立Socket=<%d>成功\n",m_hSocket);
+	//printf("建立Socket=<%d>成功\n",m_hSocket);
 
 	return 0;
 }
@@ -134,7 +135,7 @@ int EasyTcpClient::Connect(const char* ip, short port)
 	}
 	else
 	{
-		printf("Socket=<%d>连接服务器<ip:%s,port:%d>成功...\n", m_hSocket, ip, port);
+		//printf("Socket=<%d>连接服务器<ip:%s,port:%d>成功...\n", m_hSocket, ip, port);
 	}
 
 	return ret;

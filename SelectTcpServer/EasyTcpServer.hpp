@@ -6,10 +6,12 @@ using namespace std;
 #include <vector>
 #include <algorithm>
 #include "MessageHeader.hpp"
+#include "CELLTimeStamp.hpp"
 #define  PORT 4567
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
+#define FD_SETSIZE      10240
 #include <windows.h>
 #include <WinSock2.h>
 #pragma comment(lib, "WS2_32.LIB")
@@ -104,7 +106,7 @@ public:
 	int RecvData(ClientSocket* pClient);
 
 	//响应网络消息
-	int OnNetMsg(SOCKET sock, DataHeader* header);
+	virtual int OnNetMsg(SOCKET sock, DataHeader* header);
 
 	//发送指定数据
 	int SendData(SOCKET sock, DataHeader* header);
@@ -115,6 +117,9 @@ public:
 private:
 	SOCKET m_hSocket;
 	vector<ClientSocket*> _clients;
+
+	CELLTimestamp _tTime;
+	int _recvCount;
 };
 
 SOCKET EasyTcpServer::InitSocket()
@@ -230,10 +235,10 @@ SOCKET EasyTcpServer::Accept()
 	}
 	else
 	{
-		NewUserJoin userJoin;
-		BatchSendData(&userJoin);
+		//NewUserJoin userJoin;
+		//BatchSendData(&userJoin);
 		_clients.push_back(new ClientSocket(new_socket));
-		printf("<Socket=%d>新客户端加入: Socket = %d, IP = %s\n", (int)m_hSocket, (int)new_socket, inet_ntoa(client_addr.sin_addr));
+		//printf("<Socket=%d>新客户端<%d>加入: Socket = %d, IP = %s\n", (int)m_hSocket, (int)_clients.size(), (int)new_socket, inet_ntoa(client_addr.sin_addr));
 	}
 
 	return new_socket;
@@ -333,6 +338,8 @@ bool EasyTcpServer::OnRun()
 			FD_CLR(m_hSocket, &fdRead);
 
 			Accept();
+
+			return true;
 		}
 
 		for (size_t i = 0; i < _clients.size(); ++i)
@@ -410,6 +417,15 @@ int EasyTcpServer::RecvData(ClientSocket* pClient)
 
 int EasyTcpServer::OnNetMsg(SOCKET sock, DataHeader* header)
 {
+	_recvCount++;
+	auto t = _tTime.getElapsedSecond();
+	if (t >= 1.0)
+	{
+		printf("time<%lf>,socket<%d>,client<%d>,recvCount:<%d>\n", t, sock, (int)_clients.size(), _recvCount);
+		_tTime.update();
+		_recvCount = 0;
+	}
+
 	switch (header->cmd)
 	{
 	case CMD_LOGIN:
@@ -418,8 +434,8 @@ int EasyTcpServer::OnNetMsg(SOCKET sock, DataHeader* header)
 		//printf("收到客户端<Socket=%d>命令:CMD_LOGIN, 数据长度;%d\n", (int)sock, login->dataLength);
 		//printf("用户登录...用户姓名:%s, 密码:%s\n", login->userName, login->passWord);
 
-		LoginResult ret;
-		SendData(sock, &ret);
+		//LoginResult ret;
+		//SendData(sock, &ret);
 	}break;
 	case CMD_LOGOUT:
 	{
@@ -427,8 +443,8 @@ int EasyTcpServer::OnNetMsg(SOCKET sock, DataHeader* header)
 		//printf("收到客户端<Socket=%d>命令:CMD_LOGOUT, 数据长度;%d\n", (int)sock, logout->dataLength);
 		//printf("用户登出...用户姓名:%s\n", logout->userName);
 
-		LogoutResult ret;
-		SendData(sock, &ret);
+		//LogoutResult ret;
+		//SendData(sock, &ret);
 	}break;
 	default:
 	{
