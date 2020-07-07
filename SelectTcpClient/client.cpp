@@ -26,7 +26,7 @@ void cmdThread()
 int main()
 {
 	//const int cCount = FD_SETSIZE - 1;
-	const int cCount = 10000;
+	const int cCount = 1000;
 	EasyTcpClient *client[cCount];
 
 	for (int i = 0; i < cCount; ++i)
