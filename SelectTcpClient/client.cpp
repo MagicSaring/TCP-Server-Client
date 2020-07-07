@@ -2,12 +2,66 @@
 #include "EasyTcpClient.hpp" 
 
 bool g_bRun = true;
+
+//客户端数量
+const int cCount = 1000;
+//发送线程数量
+const int tCount = 4;
+//客户端数组
+EasyTcpClient* client[cCount];
+
+void sendThread(int id)
+{
+	//4个线程 1 - 4
+	int c = cCount / tCount;
+	int begin = (id - 1) * c;
+	int end = id * c;
+
+	for(int i = begin; i < end; ++i)
+	{
+		if (!g_bRun)
+		{
+			return;
+		}
+		client[i] = new EasyTcpClient();
+	}
+
+	for (int i = begin; i < end; ++i)
+	{
+		if (!g_bRun || client[i]->Connect("127.0.0.1", 4567) == SOCKET_ERROR)
+		{
+			return;
+		}
+
+		//printf("Connect=%d\n", i);
+		printf("thread<%d>,Connect=%d\n", id, i);
+	}
+
+	Login login;
+	mystrcpy(login.userName, "magic");
+	mystrcpy(login.passWord, "rere2121");
+
+	while (g_bRun)
+	{
+		for (int i = begin; i < end; ++i)
+		{
+			client[i]->SendData(&login);
+			//client[i]->OnRun();
+		}
+	}
+
+	for (int i = begin; i < end; ++i)
+	{
+		client[i]->Close();
+	}
+
+	printf("已退出..\n");
+}
+
 void cmdThread()
 {
 	while (true)
 	{
-		/*printf("Please input your cmd\n");*/
-
 		char cmdBuff[256] = {};
 		scanf("%s", &cmdBuff);
 		if (0 == strcmp(cmdBuff, "exit"))
@@ -23,55 +77,25 @@ void cmdThread()
 	}
 }
 
+
+
 int main()
 {
-	//const int cCount = FD_SETSIZE - 1;
-	const int cCount = 1000;
-	EasyTcpClient *client[cCount];
-
-	for (int i = 0; i < cCount; ++i)
-	{
-		if (!g_bRun)
-		{
-			return 0;
-		}
-		client[i] = new EasyTcpClient();
-	}
-
-	for (int i = 0; i < cCount; ++i)
-	{
-		if (!g_bRun || client[i]->Connect("127.0.0.1", 4567) == SOCKET_ERROR)
-		{
-			return 0;
-		}
-
-		printf("Connect=%d\n", i);
-	}
-
-	Login login;
-	mystrcpy(login.userName, "magic");
-	mystrcpy(login.passWord, "rere2121");
-
 	//启动UI线程
 	std::thread t(cmdThread);
 	t.detach();
 
+	//启动发送线程
+	for (int i = 0; i < tCount; ++i)
+	{
+		std::thread t1(sendThread, i + 1);
+		t1.detach();
+	}
+
 	while (g_bRun)
 	{
-		for (int i = 0; i < cCount; ++i)
-		{
-			client[i]->SendData(&login);
-			client[i]->OnRun();
-		}
-
+		Sleep(100);
 	}
-
-	for (int i = 0; i < cCount; ++i)
-	{
-		client[i]->Close();
-	}
-
-	printf("已退出..\n");
 
 	return 0;
 }
