@@ -1,10 +1,10 @@
 ﻿
-#include "EasyTcpClient.hpp" 
+#include "EasyTcpClient.hpp"
 
 bool g_bRun = true;
 
 //客户端数量
-const int cCount = 1000;
+const int cCount = 10000;
 //发送线程数量
 const int tCount = 4;
 //客户端数组
@@ -32,20 +32,25 @@ void sendThread(int id)
 		{
 			return;
 		}
-
-		//printf("Connect=%d\n", i);
 		printf("thread<%d>,Connect=%d\n", id, i);
 	}
 
-	Login login;
-	mystrcpy(login.userName, "magic");
-	mystrcpy(login.passWord, "rere2121");
+	std::chrono::milliseconds t(5000);
+	std::this_thread::sleep_for(t);
+
+	Login login[10];
+
+	for (int i = 0; i < 10; ++i)
+	{
+		mystrcpy(login[i].userName, "magic");
+		mystrcpy(login[i].passWord, "rere2121");
+	}
 
 	while (g_bRun)
 	{
 		for (int i = begin; i < end; ++i)
 		{
-			client[i]->SendData(&login);
+			client[i]->SendData(login, 10);
 			//client[i]->OnRun();
 		}
 	}
@@ -76,8 +81,6 @@ void cmdThread()
 		}
 	}
 }
-
-
 
 int main()
 {

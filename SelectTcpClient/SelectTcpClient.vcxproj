@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{78eba5dd-b3a2-4c58-9e2f-a34a18500329}</ProjectGuid>
+    <ProjectGuid>{D8EF0882-B74F-4EAB-8BEC-03C07278DDFE}</ProjectGuid>
     <RootNamespace>EasyTcpClient</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>

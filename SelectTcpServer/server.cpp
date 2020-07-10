@@ -9,8 +9,6 @@ void cmdThread()
 {
 	while (true)
 	{
-		/*printf("Please input your cmd\n");*/
-
 		char cmdBuff[256] = {};
 		scanf("%s", &cmdBuff);
 		if (0 == strcmp(cmdBuff, "exit"))
@@ -44,6 +42,8 @@ int main()
 	{
 		return 0;
 	}
+
+	server.Start();
 
 	//启动UI线程
 	std::thread t(cmdThread);
