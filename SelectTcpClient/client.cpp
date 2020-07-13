@@ -4,7 +4,7 @@
 bool g_bRun = true;
 
 //客户端数量
-const int cCount = 10000;
+const int cCount = 10;
 //发送线程数量
 const int tCount = 4;
 //客户端数组
@@ -12,6 +12,7 @@ EasyTcpClient* client[cCount];
 
 void sendThread(int id)
 {
+	printf("thread<%d>,start\n", id);
 	//4个线程 1 - 4
 	int c = cCount / tCount;
 	int begin = (id - 1) * c;
@@ -32,10 +33,11 @@ void sendThread(int id)
 		{
 			return;
 		}
-		printf("thread<%d>,Connect=%d\n", id, i);
 	}
 
-	std::chrono::milliseconds t(5000);
+	printf("thread<%d>,Connect<begin=%d, end=%d>\n", id, begin, end);
+
+	std::chrono::milliseconds t(3000);
 	std::this_thread::sleep_for(t);
 
 	Login login[10];
@@ -51,16 +53,18 @@ void sendThread(int id)
 		for (int i = begin; i < end; ++i)
 		{
 			client[i]->SendData(login, 10);
-			//client[i]->OnRun();
+			client[i]->OnRun();
 		}
 	}
 
 	for (int i = begin; i < end; ++i)
 	{
 		client[i]->Close();
+		delete client[i];
 	}
 
-	printf("已退出..\n");
+	printf("thread<%d>,exit\n", id);
+	//printf("已退出..\n");
 }
 
 void cmdThread()

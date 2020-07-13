@@ -30,13 +30,15 @@
 
 class EasyTcpClient
 {
+private:
+	SOCKET m_hSocket;
+	bool isConnect;
+
 public:
 	EasyTcpClient()
 	{
 		m_hSocket = INVALID_SOCKET;
-		memset(_szRecv, 0, sizeof(_szRecv));
-		memset(_szMsgBuf, 0, sizeof(_szMsgBuf));
-		_lastPos = 0;
+		isConnect = false;
 	}
 	//虚析构函数
 	virtual ~EasyTcpClient()
@@ -114,6 +116,7 @@ public:
 		}
 		else
 		{
+			isConnect = true;
 			//printf("Socket=<%d>连接服务器<ip:%s,port:%d>成功...\n", m_hSocket, ip, port);
 		}
 
@@ -135,7 +138,17 @@ public:
 #endif // _WIN32
 			m_hSocket = INVALID_SOCKET;
 		}
+
+		isConnect = false;
 	}
+
+	//接收缓冲区
+	char _szRecv[RECV_BUFF_SIZE] = {};
+	//第二缓冲区,消息缓冲区
+	char _szMsgBuf[RECV_BUFF_SIZE * 5] = {};
+	//消息缓冲区的数据尾部位置
+	int _lastPos = 0;
+
 	//接收数据,处理粘包,拆分包
 	int RecvData(SOCKET _sock)
 	{
@@ -218,11 +231,16 @@ public:
 	//发送数据
 	int SendData(DataHeader* header, int nLen)
 	{
+		int ret = SOCKET_ERROR;
 		if (isRun() && header)
 		{
-			return send(m_hSocket, (const char*)header, nLen, 0);
+			ret = send(m_hSocket, (const char*)header, nLen, 0);
+			if (SOCKET_ERROR == ret)
+			{
+				Close();
+			}
 		}
-		return SOCKET_ERROR;
+		return ret;
 	}
 	//处理网络消息
 	bool OnRun()
@@ -279,37 +297,10 @@ public:
 	//是否运行中
 	bool isRun()
 	{
-		return m_hSocket != INVALID_SOCKET;
+		return m_hSocket != INVALID_SOCKET && isConnect;
 	}
 
-private:
-	SOCKET m_hSocket;
 
-	//接收缓冲区
-	char _szRecv[RECV_BUFF_SIZE] = {};
-
-	//第二缓冲区,消息缓冲区
-	char _szMsgBuf[RECV_BUFF_SIZE * 10] = {};
-
-	//消息缓冲区的数据尾部位置
-	int _lastPos = 0;
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 #endif
